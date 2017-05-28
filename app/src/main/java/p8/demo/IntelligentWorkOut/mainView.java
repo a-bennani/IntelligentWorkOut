@@ -9,7 +9,6 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -21,15 +20,15 @@ import static java.lang.Math.abs;
 public class mainView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 
     // thread utiliser pour animer les zones de depot des diamants
-    private boolean in = true;
+    private boolean paused = true;
     private Thread cv_thread;
     SurfaceHolder holder;
 
     Paint paint;
 
     // Declaration des images
-    private Bitmap block;
-    private Bitmap diamant;
+    private Bitmap BlueBlock;
+    private Bitmap RedBlock;
     private Bitmap win;
 
     private boolean isWon = false;
@@ -38,31 +37,31 @@ public class mainView extends SurfaceView implements SurfaceHolder.Callback, Run
     private Resources mRes;
     private Context mContext;
 
-    // tableau modelisant la carte du jeu
-    int[][] carte;
+    // tableau modelisant la PlayerCard du jeu
+    static int[][] PlayerCard;
 
     // tableau de reference du terrain
-    int[][] ref;
+    static int[][] RefCard;
 
-    // ancres pour pouvoir centrer la carte du jeu
-    Rect TopRect;                   // coordonn�es en Y du point d'ancrage de notre carte
+    // ancres pour pouvoir centrer la PlayerCard du jeu
+    Rect TopRect;                   // coordonn�es en Y du point d'ancrage de notre PlayerCard
     Rect BottomRect;
 
     int evtDownX;
     int evtDownY;
 
-    // coordonn�es en X du point d'ancrage de notre carte
+    // coordonn�es en X du point d'ancrage de notre PlayerCard
 
-    // taille de la carte
-    static final int carteWidth = 5;
-    static final int carteHeight = 5;
+    // taille de la PlayerCard
+    static int MatrixWidth = 5;
+    static int MatrixHeight = 5;
     int carteTileSize;
     int refTileSise;
     int Margin;
 
     // constante modelisant les differentes types de cases
-    static final int CST_block = 0;
-    static final int CST_diamant = 1;
+    static final int BlueValue = 0;
+    static final int RedValue = 1;
 
     /**
      * The constructor called from the main JetBoy activity
@@ -80,8 +79,8 @@ public class mainView extends SurfaceView implements SurfaceHolder.Callback, Run
         // chargement des images
         mContext = context;
         mRes = mContext.getResources();
-        block = BitmapFactory.decodeResource(mRes, R.drawable.bleu);
-        diamant = BitmapFactory.decodeResource(mRes, R.drawable.rouge);
+        BlueBlock = BitmapFactory.decodeResource(mRes, R.drawable.bleu);
+        RedBlock = BitmapFactory.decodeResource(mRes, R.drawable.rouge);
         win = BitmapFactory.decodeResource(mRes, R.drawable.bravo);
 
         // creation du thread
@@ -100,25 +99,25 @@ public class mainView extends SurfaceView implements SurfaceHolder.Callback, Run
     private void loadlevel() {
         int x, y;
         Random rn = new Random();
-        for (int i = 0; i < carteHeight; i++) {
-            for (int j = 0; j < carteWidth; j++) {
-                carte[j][i] = CST_block;
-                ref[j][i] = CST_block;
+        for (int i = 0; i < MatrixHeight; i++) {
+            for (int j = 0; j < MatrixWidth; j++) {
+                PlayerCard[j][i] = BlueValue;
+                RefCard[j][i] = BlueValue;
             }
         }
         for (int i = 0; i < 9; i++) {
             do {
-                x = rn.nextInt(carteHeight);
-                y = rn.nextInt(carteWidth);
-            } while (carte[x][y] == CST_diamant);
-            carte[x][y] = CST_diamant;
+                x = rn.nextInt(MatrixHeight);
+                y = rn.nextInt(MatrixWidth);
+            } while (PlayerCard[x][y] == RedValue);
+            PlayerCard[x][y] = RedValue;
         }
         for (int i = 0; i < 9; i++) {
             do {
-                x = rn.nextInt(carteHeight);
-                y = rn.nextInt(carteWidth);
-            } while (ref[x][y] == CST_diamant);
-            ref[x][y] = CST_diamant;
+                x = rn.nextInt(MatrixHeight);
+                y = rn.nextInt(MatrixWidth);
+            } while (RefCard[x][y] == RedValue);
+            RefCard[x][y] = RedValue;
         }
     }
 
@@ -126,17 +125,17 @@ public class mainView extends SurfaceView implements SurfaceHolder.Callback, Run
         if (getWidth() < getHeight()) {
             TopRect = new Rect(getLeft(), getTop(), getRight(), getHeight() / 3 - 20);
             BottomRect = new Rect(getLeft(), getHeight() / 3, getRight(), getBottom());
-            carteTileSize = BottomRect.width() / carteWidth;
-            refTileSise = TopRect.height() / carteHeight;
-            Margin = (TopRect.width() - carteWidth * refTileSise) / 2;
+            carteTileSize = BottomRect.width() / MatrixWidth;
+            refTileSise = TopRect.height() / MatrixHeight;
+            Margin = (TopRect.width() - MatrixWidth * refTileSise) / 2;
             TopRect.left += Margin;
             TopRect.right -= Margin;
         } else {
             TopRect = new Rect(getWidth() * 2 / 3 + 20, getTop(), getRight(), getBottom());
             BottomRect = new Rect(getLeft(), getTop(), getWidth() * 2 / 3, getBottom());
-            carteTileSize = BottomRect.height() / carteHeight;
-            refTileSise = TopRect.width() / carteWidth;
-            Margin = (TopRect.height() - carteHeight * refTileSise) / 2;
+            carteTileSize = BottomRect.height() / MatrixHeight;
+            refTileSise = TopRect.width() / MatrixWidth;
+            Margin = (TopRect.height() - MatrixHeight * refTileSise) / 2;
             TopRect.top += Margin;
             TopRect.bottom -= Margin;
         }
@@ -153,15 +152,17 @@ public class mainView extends SurfaceView implements SurfaceHolder.Callback, Run
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeWidth(3);
         paint.setTextAlign(Paint.Align.LEFT);
-        carte = new int[carteHeight][carteWidth];
-        ref = new int[carteHeight][carteWidth];
+        PlayerCard = new int[MatrixHeight][MatrixWidth];
+        RefCard = new int[MatrixHeight][MatrixWidth];
         loadlevel();
         //recalibrage des dimentions
         reshape();
+/*
         if ((cv_thread != null) && (!cv_thread.isAlive())) {
             cv_thread.start();
             Log.e("-FCT-", "cv_thread.start()");
         }
+*/
     }
 
     // dessin des fleches
@@ -176,20 +177,20 @@ public class mainView extends SurfaceView implements SurfaceHolder.Callback, Run
                 BottomRect.bottom - BottomRect.height()/3), null);
     }
 
-    // dessin de la carte du jeu
+    // dessin de la PlayerCard du jeu
     private void paintcarte(Canvas canvas) {
-        for (int i = 0; i < carteHeight; i++) {
-            for (int j = 0; j < carteWidth; j++) {
+        for (int i = 0; i < MatrixHeight; i++) {
+            for (int j = 0; j < MatrixWidth; j++) {
                 Rect rectCarte = new Rect(BottomRect.left + j * carteTileSize,//left
                         BottomRect.top + i * carteTileSize,// top
                         BottomRect.left + j * carteTileSize + carteTileSize, //right
                         BottomRect.top + i * carteTileSize + carteTileSize);//bottom
-                switch (carte[i][j]) {
-                    case CST_block:
-                        canvas.drawBitmap(block, null, rectCarte, null);
+                switch (PlayerCard[i][j]) {
+                    case BlueValue:
+                        canvas.drawBitmap(BlueBlock, null, rectCarte, null);
                         break;
-                    case CST_diamant:
-                        canvas.drawBitmap(diamant, null, rectCarte, null);
+                    case RedValue:
+                        canvas.drawBitmap(RedBlock, null, rectCarte, null);
                         break;
                 }
             }
@@ -198,18 +199,18 @@ public class mainView extends SurfaceView implements SurfaceHolder.Callback, Run
 
     // dessin de la refCarte
     private void paintref(Canvas canvas) {
-        for (int i = 0; i < carteHeight; i++) {
-            for (int j = 0; j < carteWidth; j++) {
+        for (int i = 0; i < MatrixHeight; i++) {
+            for (int j = 0; j < MatrixWidth; j++) {
                 Rect rectCarte = new Rect(TopRect.left + j * refTileSise, //left
                         TopRect.top + i * refTileSise, // top
                         TopRect.left + j * refTileSise + refTileSise, //right
                         TopRect.top + i * refTileSise + refTileSise); //bottom
-                switch (ref[i][j]) {
-                    case CST_block:
-                        canvas.drawBitmap(block, null, rectCarte, null);
+                switch (RefCard[i][j]) {
+                    case BlueValue:
+                        canvas.drawBitmap(BlueBlock, null, rectCarte, null);
                         break;
-                    case CST_diamant:
-                        canvas.drawBitmap(diamant, null, rectCarte, null);
+                    case RedValue:
+                        canvas.drawBitmap(RedBlock, null, rectCarte, null);
                         break;
                 }
             }
@@ -218,9 +219,9 @@ public class mainView extends SurfaceView implements SurfaceHolder.Callback, Run
 
     // permet d'identifier si la partie est gagnee (tous les diamants à leur place)
     private boolean isWon() {
-        for (int i = 0; i < carteHeight; i++) {
-            for (int j = 0; j < carteWidth; j++) {
-                if (carte[j][i] != ref[j][i])
+        for (int i = 0; i < MatrixHeight; i++) {
+            for (int j = 0; j < MatrixWidth; j++) {
+                if (PlayerCard[j][i] != RefCard[j][i])
                     return false;
             }
         }
@@ -256,6 +257,58 @@ public class mainView extends SurfaceView implements SurfaceHolder.Callback, Run
      * run (run du thread créé)
      * on endort le thread, on modifie le compteur d'animation, on prend la main pour dessiner et on dessine puis on libère le canvas
      */
+    public void pause()
+    {
+        Log.i("-> FCT <-", "pause");
+        paused = true;
+        synchronized (cv_thread) {
+            while (paused) {
+                try {
+                    cv_thread.join();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                break;
+            }
+            cv_thread = null;
+        }
+    }
+
+    public void resume() {
+        Log.i("-> FCT <-", "resume");
+        if (cv_thread == null) {
+            cv_thread = new Thread(this);
+            Log.i("-> FCT <-", "thread create and start");
+        }
+        cv_thread.start();
+
+        paused = false;
+        synchronized (cv_thread) {
+            cv_thread.notifyAll();
+        }
+    }
+
+    public void run() {
+        Log.i("-> FCT <-", "run");
+        while (!paused)
+        {
+            synchronized (cv_thread){
+
+            }
+            if (!holder.getSurface().isValid())
+                continue;
+            Canvas c = holder.lockCanvas(null);
+            nDraw(c);
+            holder.unlockCanvasAndPost(c);
+            try {
+                cv_thread.sleep(100);
+            } catch (InterruptedException e) {
+                Log.e("-> RUN <-", "PB DANS RUN");
+            }
+        }
+    }
+
+/*
     public void run() {
         while (in) {
             if (!holder.getSurface().isValid())
@@ -270,6 +323,7 @@ public class mainView extends SurfaceView implements SurfaceHolder.Callback, Run
             }
         }
     }
+*/
 
     // fonction permettant de recuperer les evenements tactiles
     @Override
@@ -296,31 +350,31 @@ public class mainView extends SurfaceView implements SurfaceHolder.Callback, Run
                             int i = (evtDownY - BottomRect.top) / carteTileSize;
                             if(deltaX < 0){ //to left
                                 Log.i("-> FCT <-", "swip to left " + i);
-                                int tmp = carte[i][0];
-                                for(int j = 0; j < carteWidth - 1;j++)
-                                    carte[i][j] = carte[i][j+1];
-                                carte[i][carteWidth - 1] = tmp;
+                                int tmp = PlayerCard[i][0];
+                                for(int j = 0; j < MatrixWidth - 1; j++)
+                                    PlayerCard[i][j] = PlayerCard[i][j+1];
+                                PlayerCard[i][MatrixWidth - 1] = tmp;
                             } else { // to right
                                 Log.i("-> FCT <-", "swip to right " + i);
-                                int tmp = carte[i][carteWidth - 1];
-                                for(int j = carteWidth - 1; j > 0 ;j--)
-                                    carte[i][j] = carte[i][j-1];
-                                carte[i][0] = tmp;
+                                int tmp = PlayerCard[i][MatrixWidth - 1];
+                                for(int j = MatrixWidth - 1; j > 0 ; j--)
+                                    PlayerCard[i][j] = PlayerCard[i][j-1];
+                                PlayerCard[i][0] = tmp;
                             }
                         }else if (abs(deltaX) < abs(deltaY)){ //swipe vertically
                             int j = (evtDownX - BottomRect.left) / carteTileSize;
                             if(deltaY < 0){ // to top
                                 Log.i("-> FCT <-", "swip to top " + j);
-                                int tmp = carte[0][j];
-                                for(int i = 0; i < carteHeight - 1;i++)
-                                    carte[i][j] = carte[i+1][j];
-                                carte[carteHeight - 1][j] = tmp;
+                                int tmp = PlayerCard[0][j];
+                                for(int i = 0; i < MatrixHeight - 1; i++)
+                                    PlayerCard[i][j] = PlayerCard[i+1][j];
+                                PlayerCard[MatrixHeight - 1][j] = tmp;
                             }else { // to bottom
                                 Log.i("-> FCT <-", "swip to bottom " + j);
-                                int tmp = carte[carteHeight - 1][j];
-                                for(int i = carteHeight - 1; i > 0;i--)
-                                    carte[i][j] = carte[i-1][j];
-                                carte[0][j] = tmp;
+                                int tmp = PlayerCard[MatrixHeight - 1][j];
+                                for(int i = MatrixHeight - 1; i > 0; i--)
+                                    PlayerCard[i][j] = PlayerCard[i-1][j];
+                                PlayerCard[0][j] = tmp;
                             }
                         }
                     }

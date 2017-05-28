@@ -8,8 +8,10 @@ import android.view.View;
 public class mainActivity extends Activity {
 
     private mainView mView;
-	
-	/** Called when the activity is first created. */
+
+    /**
+     * Called when the activity is first created.
+     */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // initialise notre activity avec le constructeur parent    	
@@ -20,5 +22,19 @@ public class mainActivity extends Activity {
         mView = (mainView) findViewById(R.id.mainView);
         // rend visible la vue
         mView.setVisibility(View.VISIBLE);
+    }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mView.pause();
+        //mView.stopTimer();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mView.resume();
     }
 }
